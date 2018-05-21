@@ -12,7 +12,7 @@ CFLAGS = -Wall
 .c.o:	
 	$(CC) $(CFLAGS) -c $*.c #-c source file
 
-all:	Prg_1 test clean 
+all:	Prg_1 Prg_2 test clean 
 
 Threads.o:	Threads.c Threads.h
 	$(CC) -c Threads.c
@@ -23,10 +23,15 @@ Processes.o:	Processes.c Processes.h
 Prg_1: Processes.o Threads.o Prg_1.o 
 	$(CC) -o Prg_1 Prg_1.c Processes.o Threads.o  -lrt
 
-clean:
-	rm -rf *.o Prg_1
+Prg_2: Prg_2.o
+	$(CC) -o Prg_2 Prg_2.c -lrt
 
-test: test1
+clean:
+	rm -rf *.o Prg_1 Prg_2
+
+test: test1 test2
 
 test1:
 	./Prg_1
+test2:
+	./Prg_2
