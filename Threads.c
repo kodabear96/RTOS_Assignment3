@@ -1,116 +1,103 @@
 /* 
-/	Brief: This includes the implementation of the three threads (A, B & C) including semaphores, a pipe
-/	These thread process a data.txt file and output a src.txt file that discludes the header
+/	Brief: This includes the implementation of the two threads and a FIFO
+/	These threads simulate the scheduling of 7 processes using a STRF algorithm and ouput the  average waiting 		and turnaround times to a file called "output.txt"
 /
 /  	Author: Dakota Harkins
-/  	Date: 29/04/2018
+/  	Date: 22/05/2018
 */
 
 
 #include "Threads.h"
 
 //CONSTANTS
-#define numberOfProcesses 7 			//defined in the 
-
-//STRUCTS
-typedef struct					//stores information of each process
-{
-  int pid;					//process id
-  int arrivalTime, burstTime, remainingTime;	//process time values
-}process;
-
-//GLOBALS
-sem_t Semaphore_1, Semaphore_2; // Semaphores that control threads
-pthread_t threadId1, threadId2; //Thread Ids
-
-process pro[8];
+#define FIFONAME "FIFO" 			//Name of the FIFO
+pthread_t threadId1, threadId2; 	//thread definitions
 
 //FUNCTIONS
 void initialiseThreads() {
 
-    /* Initialise semaphores and set to 0 */
-    if (sem_init( &Semaphore_1, 0, 0)) {
-        perror("Failed to initialise semaphore 1");
-        exit(EXIT_FAILURE);
-    };
+        /* Unlink and create FIFO */
+        unlink(FIFONAME);
+        if (mkfifo(FIFONAME, S_IRWXU) < 0) {
+                exit(1);
+        }
 
-    if (sem_init( &Semaphore_2, 0, 0)) {
-        perror("Failed to initialise semaphore 2");
-        exit(EXIT_FAILURE);
-    };
+        /* Create threads */
+        if (pthread_create( & threadId1, NULL, & thread1, NULL)) {
+                perror("Thread 1 init failed");
+                exit(1);
+        }
 
-    /* Create thread attributes */
-    pthread_attr_t attr;
-
-    /* Initialise thread attributes */
-    if (pthread_attr_init( & attr)) {
-        perror("Failed to initialise thread attributes");
-        exit(EXIT_FAILURE);
-    };
-
-    /* Create threads */
-    if (pthread_create( & threadId1, & attr, & thread1, NULL)) {
-        perror("Failed to initialise thread 1");
-        exit(EXIT_FAILURE);
-    };
-
-    if (pthread_create( & threadId2, & attr, & thread2, NULL)) {
-        perror("Failed to initialise thread 2");
-        exit(EXIT_FAILURE);
-    };
-
-    /* Destroy thread attributes */
-    if (pthread_attr_destroy( & attr)) {
-        perror("Failed to destroy thread attributes");
-        exit(EXIT_FAILURE);
-    };
+        if (pthread_create( & threadId2, NULL, & thread2, NULL)) {
+                perror("Thread 2 init failed");
+                exit(1);
+        }
 }
 
 void * thread1(void * arg) {
 
-    /* Wait for Semaphore_1 */
-    sem_wait( & Semaphore_1);
+        /* 1. Run scheduling */
+        simulateScheduling();
 
-	printf("Thread 1 is starting\n");
+        /* 2. Retrieve average times */
+        float averageWaitingTime = getAverageWaitingTime();
+        float averageTurnaroundTime = getAverageTurnaroundTime();
 
-	simulateScheduling();
+        /* 3. Format average times */
+        char averageData[50];
+        sprintf(averageData, "Average Wait-time: %f\n Average Turnaround-time: %f", averageWaitingTime,
+                averageTurnaroundTime);
 
-	printf("TODO: save doubles to FIFO\n");
+        /* 4. Open FIFO */
+        int fd;
+        if ((fd = open(FIFONAME, O_WRONLY)) < 0) {
+                perror("Opening FIFO:");
+                exit(1);
+        }
 
-	printf("Thread 1 has finished. Signalling Thread 2\n");
+        /* 5. Write data to FIFO */
+        write(fd, & averageData, strlen(averageData));
 
-    /* Signal thread B */
-    sem_post( & Semaphore_2);
+        /* 6. Close FIFO */
+        close(fd);
 
-    return EXIT_SUCCESS;
 }
 
 void * thread2(void * arg) {
 
-    /* Wait for Semaphore_2 */
-    sem_wait( & Semaphore_2);
+        /* 1. Open file */
+        FILE * file;
+        file = fopen("output.txt", "w");
+        if (file == NULL) {
+                perror("Write file failed to open");
+                exit(1);
+        }
 
-	printf("Thread 2 started.\n");
-	printf("TODO: read doubels from FIFO\n");
+        /* 2. Open FIFO */
+        int fd;
+        if ((fd = open(FIFONAME, O_RDONLY)) < 0) {
+                perror("open2");
+                exit(1);
+        }
 
-    return EXIT_SUCCESS;
+        /* 3. Read from FIFO */
+        char data[60];
+        int n = read(fd, data, 60);
+        if (n == 0) {
+                exit(1);
+        }
+
+        /* 4. Close and Unlink FIFO */
+        close(fd);
+        unlink(FIFONAME);
+
+        /* 5. Write to file*/
+        fprintf(file, "%s", data);
 }
 
 void runThreads() {
 
-    /* Signal Thread 1 to start */
-    sem_post( & Semaphore_1);
+        /* Signal Thread 2 to start */
+        pthread_join(threadId2, NULL);
+}
 
-    /* Wait for thread termination and status */
-    void * threadResult;
-    if (pthread_join(threadId1, & threadResult)) {
-        errno = * ((int * ) threadResult);
-        perror("Thread 1 failed");
-        exit(EXIT_FAILURE);
-    } else if (pthread_join(threadId2, & threadResult)) {
-        errno = * ((int * ) threadResult);
-        perror("Thread 2 failed");
-        exit(EXIT_FAILURE);
-    free(threadResult);
-}
-}

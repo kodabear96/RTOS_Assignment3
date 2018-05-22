@@ -1,18 +1,19 @@
 /* 
-/	Brief: simulate CPU scheduling by applying shortest-remaining-time-first algorithm. 		measure average waiting time and turn around time in the CPU scheduling
+/	Brief: simulate CPU scheduling by applying shortest-remaining-time-first algorithm. 		
+/	measure average waiting time and turn around time in the CPU scheduling
 /
 /  	Author: Dakota Harkins
-/  	Date: 29/04/2018
+/  	Date: 22/05/2018
 */
 
 #include "Threads.h"
 
 int main() {
 
-    //1. initialise all components
+    //1. Initialise all components
     initialiseThreads();
-
-    //2. run program
+    
+    //2. Signal threads to begin
     runThreads();
 
     return EXIT_SUCCESS;

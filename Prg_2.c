@@ -1,17 +1,19 @@
-////************************************************////
-//-----------This is the program code of L5--------////
-//-----------It uses to detect deadlock process----////
-////***********************************************////
+/* 
+/	Brief: Utilises deadlock detection to report all possible deadlock or the sequence of process execution
+/	Reads process data from "Topic2_Prg_2.txt" and writes the result to "output_topic2.txt"
+/
+/  	Author: Dakota Harkins
+/  	Date: 22/05/2018
+*/
 
-
-#include <stdio.h> 
-#include <stdio.h> 
+#include <stdio.h>  
 #include <stdlib.h> 
 #include <unistd.h> 
 #include <string.h> 
 #include <pthread.h> 
 #include <semaphore.h> 
 #include <errno.h>
+#include <signal.h>
 
 int Request[9][3]; //the process request
 int Allocation[9][3]; // already allocate resources to process
@@ -23,7 +25,7 @@ int numberOfResources = 3; //the no. of process and resource
 int isDeadlocked = 0;
 
 int orderofFinishing[9];
-int numberOfProcessesFinished = 0;
+int numberOfProcessesFinished = 0;    
 
 /* FUNCTION DECLARATIONS */
 void readData();
@@ -31,19 +33,25 @@ void writeMessage();
 void writeToFile(char * strLine);
 void analyseData();
 int hasProcessCompleted(int val);
+void  SIGhandler(int);
 
 /* MAIN */
 int main() {
 
-    //1. Read the data from the file
+    //1.define signal handler
+    signal(SIGUSR1, SIGhandler);               
+
+    //2. Read the data from the file
     readData();
 
-    //2. Analyse Data
+    //3. Analyse Data
     analyseData();
 
-    //3. Write message to file
+    //4. Write message to file
     writeMessage();
 
+    //5. Raise completed signal
+    raise(SIGUSR1);
     return 0;
 }
 
@@ -66,44 +74,43 @@ void writeToFile(char * strLine) {
 }
 
 void writeMessage() {
+	char strLine[256] = "";
+	int i;
+        char formatted[3];
+        
     /* if it isn't deadlocked: print the order of the processes */
     if (!isDeadlocked) {
-        char strLine[256] = "Order of execution: ";
-        int i;
-        char formatted[3];
+    
+        strcat(strLine, "Order of execution: ");
+         
         for (i = 0; i < numberOfProcesses; i++) {;
 
             sprintf(formatted, "P%d ", orderofFinishing[i]);
             strcat(strLine, formatted);
         }
-        strcat(strLine, "\n");
-
-        writeToFile(strLine);
-        printf(strLine);
     }
 
     /* if it is deadlocked: print the deadlocked processes */
     else {
-    	char strLine[256] = "Deadlocking occured due to processes: ";
-    	int i;
-    	char formatted2[3];
+    	strcat(strLine, "Deadlocking occured due to processes: ");
+	
     	for(i =0; i < numberOfProcesses; i++)
     	{
-        	if (!hasProcessCompleted(i))
-            		sprintf(formatted2, "P%d ", i);
-            		strcat(strLine, formatted2);
+        	if (hasProcessCompleted(i) == 0)
+        	{
+            		sprintf(formatted, "P%d ", i);
+            		strcat(strLine, formatted);
     		}
-    		writeToFile("Deadlock Occured");
     	}
-        
-        /* Alert the user that the file has been written */
-    printf("Writing to output_topic2.txt has finished.\n");
+    }
+
+    writeToFile(strLine);
 }
 
-int hasProcessCompleted(int val){
+int hasProcessCompleted(int processId){
     int i;
-    for (i=0; i < numberOfProcesses; i++) {
-        if (orderofFinishing[i] == val)
+    for (i=0; i < numberOfProcessesFinished; i++) {
+        if (orderofFinishing[i] == processId)
             return 1;
     }
     return 0;
@@ -124,12 +131,12 @@ void readData() {
 
     char pval[2];
     /*first line includes available data so has to be handled separately */
-    fscanf(file, "%s %d %d %d %d %d %d %d %d %d", & pval, & Allocation[0][0], & Allocation[0][1], & Allocation[0][2], & Request[0][0], & Request[0][1], & Request[0][2], & Available[0], & Available[1], & Available[2]);
+    fscanf(file, "%s %d %d %d %d %d %d %d %d %d", pval, &Allocation[0][0], &Allocation[0][1], &Allocation[0][2], &Request[0][0], &Request[0][1], &Request[0][2], &Available[0], &Available[1], &Available[2]);
 
     /*iterate through remaining lines */
     int i;
     for (i = 1; i <= 8; i++) {
-        fscanf(file, "%s %d %d %d %d %d %d", & pval, & Allocation[i][0], & Allocation[i][1], & Allocation[i][2], & Request[i][0], & Request[i][1], & Request[i][2]);
+        fscanf(file, "%s %d %d %d %d %d %d", pval, &Allocation[i][0], &Allocation[i][1], &Allocation[i][2], &Request[i][0], &Request[i][1], &Request[i][2]);
     }
 }
 
@@ -190,4 +197,9 @@ void analyseData() {
         isDeadlocked = (currentFinished == numberProcessesFinished);
         numberProcessesFinished = currentFinished;
     }
+}
+
+void  SIGhandler(int sig)
+{
+     printf("Writing to output_topic2.txt has finished.\n");
 }
